@@ -15,7 +15,8 @@ string helpString = "Spectrograph - Terminal audio visualizer\n"
 "Usage: spectrograph {-flags} <file>\n"
 "CURRENTLY ONLY WORKS WITH RAW FILES!!!\n"
 "Flags:\n"
-"-b <size>: Size of buffer, in bytes (Default: 1024)\n"
+"-a <size>: Size of audio buffer, in bytes (Default: 1024)\n"
+"-b <size>: Size of DFT buffer, in bytes (Default: 1024)\n"
 "-c <char>: Select the character that represents the spectrogram\n"
 "-ch <channel>: Which channel you want to visualize (Default: 1)\n"
 "-c1 <r> <g> <b>: Color of bottom of gradient\n"
@@ -36,9 +37,12 @@ SDL_AudioSpec audioSpec;
 
 ifstream song;
 
+double volume;
+
 void audioMixer(void* ud, unsigned char* stream, int len)
 {
     song.read((char*)stream, len);
+    for(int i = 0; i < len; i++) stream[i] = (char)((double)stream[i]*volume);
 }
 
 int audioOpen(int frequency, SDL_AudioFormat format, int channels, int samples)
@@ -71,7 +75,8 @@ int main(int argc, char* argv[])
     bool debug = false;
     bool showNumbers = false;
     int waitTime = 1000000 / 144;
-    unsigned bufferSize = 2048;
+    unsigned bufferSize = 1024;
+    unsigned audioBufferSize = 1024;
 
     SDL_AudioFormat audioFormat = AUDIO_U8;
     int numChannels = 1;
@@ -79,8 +84,6 @@ int main(int argc, char* argv[])
     unsigned frequency = 44100;
     bool staticDB = false;
     int divisor;
-
-    float volume = 1;
 
     bool loop = false;
 
@@ -96,7 +99,17 @@ int main(int argc, char* argv[])
         {
             string argument = argv[i];
 
-            if(argument == "-b") // Buffer size
+            if(argument == "-a")
+            {
+                if(i==argc-1)
+                {
+                    cout << "Malformed expression: -a" << endl;
+                    return 1;
+                }
+                audioBufferSize = atoi(argv[i+1]);
+                i += 2;
+            }
+            else if(argument == "-b") // Buffer size
             {
                 if(i==argc-1)
                 {
@@ -277,7 +290,7 @@ int main(int argc, char* argv[])
 
     if(!song.is_open())
     {
-        cout << "Error reading " << argv[argc-1] << endl;
+        cout << "Error reading " << (useSongName?songName:argv[argc-1]) << endl;
         return 1;
     }
 
@@ -306,7 +319,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    if(audioOpen(frequency, audioFormat, numChannels, 8192) != 0)
+    if(audioOpen(frequency, audioFormat, numChannels, audioBufferSize) != 0)
     {
         cout << "Couldn't open audio device." << endl;
         return 1;
